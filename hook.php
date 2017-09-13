@@ -29,87 +29,11 @@ class GoobiTelegram extends Telegram {
 		$this->text = $string;
 	}
 	
-	
-	public function sendResult($chat_id,$result){
-		$option = array();
-		foreach($result["response"]["docs"] as $item){
-			#$item['MD_AUTHOR'][0].", ".$item['MD_TITLE'][0].$item['SORT_YEARPUBLISH'];
-			array_push($option,array($this->buildInlineKeyboardButton($text=$item['MD_CREATOR'][0].": ".$item['MD_TITLE'][0].", ".$item['SORT_YEARPUBLISH'], "", "{\"PI_ID\": \"".$item['PI_TOPSTRUCT']."\" }","")));		
-		}
-		
-		/*Registering all TinyURL takes a few seconds, the first ten results are able to display immediately, so we will send them to user now */
-		$reply='We found '.$result["response"]["numFound"].' Documents searching for <i>'.$result["responseHeader"]["params"]["q"].'</i>';
-		$keyb = $this->buildInlineKeyBoard($option);
-		$content = array('chat_id' => $chat_id, 'text' => $reply, 'parse_mode' => 'HTML', 'reply_markup' => $keyb); 
-		$this->sendMessage($content);
-		
-		$option = array();
-		$reply='Browse through the Resultset';  # An empty Message isn't allowed...
-		
-		/*Creating the Paginator-Tool, if the resultset is greater then 10 */
-		$solrURL = "https://emedien.arbeiterkammer.at/solr/collection1/select?q=".urlencode($result["responseHeader"]["params"]["q"])."&indent=true&wt=json&rows=".$result["responseHeader"]["params"]["rows"];
-		#Enter Result-Set-Paginator
-		$pages = paginator($result["responseHeader"]["params"]["start"],$result["response"]["numFound"],$result["responseHeader"]["params"]["rows"]);
-		if(!empty($pages)){ 
-			$pages = json_decode($pages,true); 
-			$nav_option = array();
-			for($i=0;$i<count($pages);$i++){
-				#Buildling an seperat Array for each Navigation-Button.
-				#The callback_data field is limited to 64 bytes, so the solrURL has to be converted to a tinyURL first.
-				$longurl = $solrURL."&start=".$pages[$i]["start"];
-				$tinyurl = registerTinyURL($longurl,$this->tinyurl_api);
-				array_push($nav_option,$this->buildInlineKeyboardButton($text=$pages[$i]["label"],"", "{\"solrURL\": \"".$tinyurl."\" }",""));
-				#$content = array('chat_id' => $chat_id, 'text' => $longurl."\n\n".$tinyurl, 'parse_mode' => 'HTML', 'reply_markup' => $keyb); 
-				#$this->sendMessage($content);
-			}
-			
-			array_push($option,$nav_option);
-		$keyb = $this->buildInlineKeyBoard($option);
-		
-		#if(!empty($search_field)){ $reply .= trim($command[0])." "; }
-		#$reply .= $search_string;
-		$content = array('chat_id' => $chat_id, 'text' => $reply, 'parse_mode' => 'HTML', 'reply_markup' => $keyb); 
-		$this->sendMessage($content);
-		}
-		}
-		
-		
-	
-	public function sendPDF($chat_id){
-		
-		
-		
-		if(!empty($this->processID)){
-			$file_path=shell_exec('bash /home/cerlingeadmin/bot/getPDF.sh '.$this->processID);
-			$reply=$this->text." is found @ <a href='https://resolver.obvsg.at/".$this->text."'>emedien.arbeiterkammer.at</a> ";
-			#$reply=$text." is found in Goobi-Process#".$processID."\nDatei: ".$file_path;
-			$content = array('chat_id' => $chat_id, 'text' => $reply, 'parse_mode' => 'HTML');
-			$this->sendMessage($content);
-		
-			
-			/* 
-			#Photo-Versand
-			$img = curl_file_create('image.jpg','image/jpg'); 
-			$content = array('chat_id' => $chat_id, 'photo' => $img );
-			$telegram->sendPhoto($content); */
-			
-			$doc = curl_file_create(trim($file_path),'application/pdf'); 
-			$content = array('chat_id' => $chat_id, 'document' => $doc );
-			$this->sendDocument($content);
-		}
-		else {
-			$reply = "Unfortunately ".$this->text." is not found automatically.\nPlease visit <a href='https://emedien.arbeiterkammer.at'>emedien.arbeiterkammer.at</a>";
-			$content = array('chat_id' => $chat_id, 'text' => $reply, 'parse_mode' => 'HTML');
-			$this->sendMessage($content);
-		}
-	}
-	
 }
 
 
 
 $telegram = new GoobiTelegram($bot_id);
-$telegram->setTinyURLAPI($tinyurl_api);
 
 $result = $telegram->getData();
 	
@@ -134,59 +58,18 @@ if(!empty($callback_query)){
 	#$reply = "Callback data value: ".$telegram->Callback_Data();
 	
 	$str = json_decode($telegram->Callback_Data(),true);
-	
-
-	if(array_key_exists('solrURL',$str)){
-		$callback_text = $str['solrURL'];	
-			
-		$result = getSolrResponseViaURL($callback_text);		
-		$telegram->sendResult($telegram->Callback_ChatID(),$result);
-		$chat_id = $telegram->Callback_ChatID();
-		#$content = array('chat_id' => $chat_id, 'text' => "solrURL exists", 'parse_mode' => 'Markdown', 'reply_markup' => $keyb); 
-		#$telegram->sendMessage($content);	
-	}
-	else {
-		if(array_key_exists('URN',$str)){
-			$callback_text = $str['URN'];	
-		}
-		
-		if(array_key_exists('PI_ID',$str)){
-			$callback_text = $str['PI_ID'];
-		}
-		
-		$telegram->setProcessID(getProcessID($callback_text,$db));
-		
-		$telegram->getMetaXML();
-		$urn = $telegram->xml->getNodeValue("(//goobi:goobi/goobi:metadata[@name='_urn'])[1]");
-		$telegram->setReplyText($urn);
-			
-		$telegram->sendPDF($telegram->Callback_ChatID());
-		$chat_id = $telegram->Callback_ChatID();
-	}
 
 	
 }
 else {
-	#Processing of Users-Text-Input
-	/*if(preg_match('/^\/doi/',$text,$match)){	
-		#If an URN is given, return a PDF if exists.
-		#$telegram->setProcessID(getProcessID($text,$db));	
-		#$telegram->setReplyText("DOI");
-		
-		$content = array('chat_id' => $chat_id, 'text' => $match[0], 'parse_mode' => 'HTML'); 
-		$telegram->sendMessage($content);	
-		
-	}*/	
-	#elseif($text=='Hallo' or $text =='Hi' or $text == '/start' or $text == '/help') {
+	
 	if($text=='Hallo' or $text =='Hi' or $text == '/start' or $text == '/help') {
 		#Introduction, Start or Help Information
 		$reply .= "*This is the Open Access TelegramBot.*
 		Send a permanent identifier (e.g. DOI, Handle, URN) or an URL of your desired article and we will look for it in different Open Access Repositories.
 		
 		If you send the /start or /help command you will receive this message one more again.";
-		#$option = array(array($telegram->buildInlineKeyboardButton($text = 'Test: urn:nbn:at:at-akw:g-781021',"","{ \"URN\": \"urn:nbn:at:at-akw:g-781021\" }","")));
-		#$keyb = $telegram->buildInlineKeyBoard($option);
-		#$content = array('chat_id' => $chat_id, 'text' => $reply, 'parse_mode' => 'Markdown', 'reply_markup' => $keyb); 
+		 
 		$content = array('chat_id' => $chat_id, 'text' => $reply, 'parse_mode' => 'Markdown'); 
 		$telegram->sendMessage($content);	
 	}			
