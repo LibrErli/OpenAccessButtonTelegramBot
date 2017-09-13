@@ -1,9 +1,13 @@
 <?php
 /**
- * Telegram Bot Example whitout WebHook.
- * It uses getUpdates Telegram's API.
- * @author Gabriele Grillo <gabry.grillo@alice.it>
- */
+Telegram-Bot Webhook for OpenAccessButton
+https://telegram.me/bOAt_oabot
+*/
+
+/* Using REST-API of openaccessbutton.org
+DOI-Example: http://dx.doi.org/10.1080/13614533.2017.1281827
+
+*/
 
 include("Telegram.php");
 
@@ -11,29 +15,7 @@ $bot_id = ''; #Telegram-API-Key
 
 
 
-/* Using REST-API of openaccessbutton.org
-DOI-Example: http://dx.doi.org/10.1080/13614533.2017.1281827
-
-*/
-
-class GoobiTelegram extends Telegram {
-		
-	public function setProcessID($processID){
-		$this->processID = $processID;
-	}
-	
-	public function setTinyURLAPI($tinyurl_api){
-		$this->tinyurl_api = $tinyurl_api;
-	}
-	public function setReplyText($string){
-		$this->text = $string;
-	}
-	
-}
-
-
-
-$telegram = new GoobiTelegram($bot_id);
+$telegram = new Telegram($bot_id);
 
 $result = $telegram->getData();
 	
